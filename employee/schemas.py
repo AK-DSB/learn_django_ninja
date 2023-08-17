@@ -11,6 +11,15 @@ class EmployeeIn(Schema):
     birthdate: date = None
 
 
+class EmployeeOut(Schema):
+    id: int
+    first_name: str
+    last_name: str
+    department_id: int = None
+    birthdate: date = None
+
+
 class EmployeeSchema(ModelSchema):
-    model = Employee
-    fields = '__all__'
+    class Config:
+        model = Employee
+        model_fields = '__all__'
