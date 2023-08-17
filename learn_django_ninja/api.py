@@ -1,9 +1,10 @@
 import datetime
-from typing import List
+from typing import List, Generic, TypeVar
 
 from django.shortcuts import get_object_or_404
-from ninja import NinjaAPI, Schema, UploadedFile, File, Path, Query
+from ninja import NinjaAPI, Schema, UploadedFile, File, Path, Query, Form
 from pydantic import Field
+from pydantic.fields import ModelField
 
 from employee.models import Employee
 from employee.schemas import EmployeeSchema, EmployeeIn, EmployeeOut
@@ -146,3 +147,92 @@ class Filters(Schema):
 @api.get('/filter')
 def filter_events(request, filters: Filters = Query(...)):
     return {'filters': filters.dict()}
+
+
+class Item(Schema):
+    name: str
+    description: str = None
+    price: float
+    quantity: int
+
+
+@api.post("/items")
+def create(request, item: Item):
+    return item
+
+
+@api.post("/items/{item_id}")
+def update(request, item_id: int, item: Item, q: str):
+    return {"item_id": item_id, "item": item.dict(), "q": q}
+
+
+@api.post('/login')
+def login(request, username: str = Form(...), password: str = Form(...)):
+    return {'username': username, 'password': f'{password}****'}
+
+
+@api.post('/form_items')
+def create_items_with_form(request, item: Item = Form(...)):
+    return item
+
+
+@api.put("/form_items/{item_id}")
+def update_item_with_form(request, item_id: int, q: str, item: Item = Form(...)):
+    return {"item_id": item_id, "item": item.dict(), "q": q}
+
+
+PydanticField = TypeVar('PydanticField')
+
+
+class EmptyStrToDefault(Generic[PydanticField]):
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, value: PydanticField, field: ModelField):
+        if value == '':
+            return field.default
+        return value
+
+
+class Item(Schema):
+    name: str
+    description: str = None
+    price: EmptyStrToDefault[float] = 0.0
+    quantity: EmptyStrToDefault[int] = 0
+    in_stock: EmptyStrToDefault[bool] = True
+
+
+@api.post("/items-blank-default")
+def update_with_form_default(request, item: Item = Form(...)):
+    return item.dict()
+
+
+@api.post('/upload')
+def upload(request, file: UploadedFile = File(...)):
+    data = file.read()
+    print(data)
+    return {'name': file.name, 'len': len(data)}
+
+
+@api.post('/upload-many')
+def upload_many(request, files: List[UploadedFile] = File(...)):
+    return [f.name for f in files]
+
+
+class UserDetails(Schema):
+    first_name: str
+    last_name: str
+    birthdate: datetime.date
+
+
+@api.post('/user')
+def create_user(request, details: UserDetails = Form(...), file: UploadedFile = File(...)):
+    return [details.dict(), file.name]
+
+
+@api.post('/user-json')
+def create_user_with_json(request, details: UserDetails, file: UploadedFile = File(...)):
+    return [details.dict(), file.name]
