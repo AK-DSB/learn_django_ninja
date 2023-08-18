@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from ninja import NinjaAPI, Schema, UploadedFile, File, Path, Query, Form, FilterSchema
 from pydantic import Field
 from pydantic.fields import ModelField
-import employee
+from django.db.models import Q, Case, When
 
 from employee.models import Employee
 from employee.schemas import EmployeeSchema, EmployeeIn, EmployeeOut
@@ -241,13 +241,104 @@ def create_user_with_json(request, details: UserDetails, file: UploadedFile = Fi
 
 
 class EmployeeFilterSchema(FilterSchema):
-    first_name: Optional[str]
-    last_name: Optional[str]
-    birthdate: Optional[datetime.datetime]
+    first_name: Optional[str] = Field(q='first_name__icontains')
+    last_name: Optional[str] = Field(q='last_name__icontains')
+    birthdate: Optional[datetime.date]
 
 
-@api.get('/list_employees', response=EmployeeSchema)
-def list_employees(request, filters: EmployeeFilterSchema = Query(...)):
+class EmployeeSearchSchema(FilterSchema):
+    # 在一个字段级别的查询是 OR 的关系
+    # 字段级别的查询是 AND 的关系
+    search: Optional[str] = Field(
+        q=['first_name__icontains', 'last_name__icontains'])
+    birthdate: Optional[datetime.date]
+
+
+class EmployeeOrSearchSchema(FilterSchema):
+    search: Optional[str] = Field(
+        q=['first_name__icontains', 'last_name__icontains'],
+        expression_connector='AND'
+    )
+    birthdate: Optional[datetime.date]
+
+    class Config:
+        expression_connector = 'OR'
+
+
+@api.get('/list_employees', response=List[EmployeeSchema])
+def list_filter_employees(request, filters: EmployeeFilterSchema = Query(...)):
+    q = Q(cv__isnull=False) & Q(Case(When(cv='', then=False), default=True))
+    employees = Employee.objects.all()
+    employees = filters.filter(employees)
+    print(employees)
+    q &= filters.get_filter_expression()
+    print(q)
+    queryset = Employee.objects.filter(q)
+    print(queryset.query)
+    for qs in queryset:
+        print(qs.cv == '')
+    return queryset
+
+
+@api.get('/list_search_employees', response=List[EmployeeSchema])
+def list_search_employees(request, filters: EmployeeSearchSchema = Query(...)):
+    employees = Employee.objects.all()
+    employees = filters.filter(employees)
+    return employees
+
+
+@api.get('/list_or_search_employees', response=List[EmployeeSchema])
+def list_or_search_employees(request, filters: EmployeeOrSearchSchema = Query(...)):
+    employees = Employee.objects.all()
+    employees = filters.filter(employees)
+    return employees
+
+
+class EmployeeIgnoreNullSchema(FilterSchema):
+    search: Optional[str] = Field(
+        q=['first_name__icontains', 'last_name__icontains'],
+        expression_connector='OR'
+    )
+    cv: Optional[str] = Field(q='cv__icontains', ignore_one=False)
+
+    class Config:
+        ignore_none = True
+        expression_connector = 'OR'
+
+
+@api.get('list_ignore_null_employees', response=List[EmployeeSchema])
+def list_ignore_null_employees(request, filters: EmployeeIgnoreNullSchema = Query(...)):
+    employees = Employee.objects.all()
+    print(employees)
+    employees = filters.filter(employees)
+    print(employees.query)
+    print(Employee.objects.all().filter(cv__icontains=filters.cv).query)
+    return employees
+
+
+class EmployeeCustomFilterSchema(FilterSchema):
+    search: Optional[str] = Field(
+        q=['first_name__icontains', 'last_name__icontains'],
+        expression_connector='OR'
+    )
+    cv: Optional[str]
+
+    def filter_cv(self, cv: str) -> Q:
+        q = Q()
+        if cv:
+            q = Q(cv__icontains=cv) | Q(
+                Case(When(cv='', then=True), default=False))
+        print('filter_cv')
+        return q
+
+    def custom_expression(self) -> Q:
+        q = super().custom_expression()
+        print(q)
+        return q
+
+
+@api.get('/list_custom_sechma_employees', response=List[EmployeeSchema])
+def list_cstom_scema_employees(request, filters: EmployeeCustomFilterSchema = Query(...)):
     employees = Employee.objects.all()
     employees = filters.filter(employees)
     return employees
