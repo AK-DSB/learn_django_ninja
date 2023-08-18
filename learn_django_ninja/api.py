@@ -1,10 +1,11 @@
 import datetime
-from typing import List, Generic, TypeVar
+from typing import List, Generic, TypeVar, Optional
 
 from django.shortcuts import get_object_or_404
-from ninja import NinjaAPI, Schema, UploadedFile, File, Path, Query, Form
+from ninja import NinjaAPI, Schema, UploadedFile, File, Path, Query, Form, FilterSchema
 from pydantic import Field
 from pydantic.fields import ModelField
+import employee
 
 from employee.models import Employee
 from employee.schemas import EmployeeSchema, EmployeeIn, EmployeeOut
@@ -122,7 +123,8 @@ def even(request, date: PathDate = Query(...)):
     return {'date': date.value()}
 
 
-weapons = ["Ninjato", "Shuriken", "Katana", "Kama", "Kunai", "Naginata", "Yari"]
+weapons = ["Ninjato", "Shuriken", "Katana",
+           "Kama", "Kunai", "Naginata", "Yari"]
 
 
 @api.get('/weapons')
@@ -236,3 +238,16 @@ def create_user(request, details: UserDetails = Form(...), file: UploadedFile = 
 @api.post('/user-json')
 def create_user_with_json(request, details: UserDetails, file: UploadedFile = File(...)):
     return [details.dict(), file.name]
+
+
+class EmployeeFilterSchema(FilterSchema):
+    first_name: Optional[str]
+    last_name: Optional[str]
+    birthdate: Optional[datetime.datetime]
+
+
+@api.get('/list_employees', response=EmployeeSchema)
+def list_employees(request, filters: EmployeeFilterSchema = Query(...)):
+    employees = Employee.objects.all()
+    employees = filters.filter(employees)
+    return employees
