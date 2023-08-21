@@ -375,7 +375,8 @@ class EmployeeDepartmentModelSchema(ModelSchema):
 @api.get('/list_employee_with_department', response=List[EmployeeDepartmentModelSchema])
 def list_employee_with_department(request):
     # queryset = Employee.objects.select_related('department').all()
-    queryset = Employee.objects.prefetch_related('department__employees').all()
+    queryset = Employee.objects.filter(
+        id__in=(1, 3)).prefetch_related('department__employees').select_related('department').all()
     print(queryset)
     print(queryset.query)
     return queryset
