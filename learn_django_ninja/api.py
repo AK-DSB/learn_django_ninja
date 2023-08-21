@@ -2,12 +2,12 @@ import datetime
 from typing import List, Generic, TypeVar, Optional
 
 from django.shortcuts import get_object_or_404
-from ninja import NinjaAPI, Schema, UploadedFile, File, Path, Query, Form, FilterSchema
+from ninja import ModelSchema, NinjaAPI, Schema, UploadedFile, File, Path, Query, Form, FilterSchema
 from pydantic import Field
 from pydantic.fields import ModelField
 from django.db.models import Q, Case, When
 
-from employee.models import Employee
+from employee.models import Department, Employee
 from employee.schemas import EmployeeSchema, EmployeeIn, EmployeeOut
 
 api = NinjaAPI()
@@ -342,3 +342,40 @@ def list_cstom_scema_employees(request, filters: EmployeeCustomFilterSchema = Qu
     employees = Employee.objects.all()
     employees = filters.filter(employees)
     return employees
+
+
+class DepartmentEmployeeSchema(Schema):
+    id: int
+    title: str
+    employees: List[EmployeeSchema]
+
+
+@api.get("/list_department_with_employees", response=List[DepartmentEmployeeSchema])
+def list_department_with_employees(request):
+    queryset = Department.objects.prefetch_related('employees').all()
+    return queryset
+
+
+class DepartmentModelSchema(ModelSchema):
+    employees: List[EmployeeSchema]
+
+    class Config:
+        model = Department
+        model_fields = '__all__'
+
+
+class EmployeeDepartmentModelSchema(ModelSchema):
+    department: DepartmentModelSchema
+
+    class Config:
+        model = Employee
+        model_fields = '__all__'
+
+
+@api.get('/list_employee_with_department', response=List[EmployeeDepartmentModelSchema])
+def list_employee_with_department(request):
+    # queryset = Employee.objects.select_related('department').all()
+    queryset = Employee.objects.prefetch_related('department__employees').all()
+    print(queryset)
+    print(queryset.query)
+    return queryset
