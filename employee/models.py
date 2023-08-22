@@ -5,6 +5,8 @@ from django.db import models
 
 class Department(models.Model):
     title = models.CharField(max_length=100)
+    parent = models.ForeignKey(
+        'Department', on_delete=models.CASCADE, db_constraint=False, related_name='children', null=True, blank=True)
 
     class Meta:
         db_table = 'department'

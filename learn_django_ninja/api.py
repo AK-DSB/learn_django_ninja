@@ -380,3 +380,24 @@ def list_employee_with_department(request):
     print(queryset)
     print(queryset.query)
     return queryset
+
+
+class DepartmentParentSchema(ModelSchema):
+    class Config:
+        model = Department
+        model_fields = '__all__'
+
+
+class DepartmentChildrenSchema(DepartmentParentSchema):
+    children: List[DepartmentParentSchema]
+
+    class Config(DepartmentParentSchema.Config):
+        pass
+
+
+@api.get('/list_department_with_children', response=List[DepartmentChildrenSchema])
+def list_department_with_children(request):
+    queryset = Department.objects.prefetch_related('children').all()
+    print(queryset)
+    print(queryset.query)
+    return queryset
