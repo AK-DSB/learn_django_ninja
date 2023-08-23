@@ -2,7 +2,7 @@ import datetime
 from typing import List, Generic, TypeVar, Optional
 
 from django.shortcuts import get_object_or_404
-from ninja import ModelSchema, NinjaAPI, Schema, UploadedFile, File, Path, Query, Form, FilterSchema
+from ninja import ModelSchema, NinjaAPI, Schema, UploadedFile, File, Path, Query, Form, FilterSchema, pagination
 from pydantic import Field
 from pydantic.fields import ModelField
 from django.db.models import Q, Case, When
@@ -401,3 +401,11 @@ def list_department_with_children(request):
     print(queryset)
     print(queryset.query)
     return queryset
+
+
+@api.get("/list_employees_with_page", response=List[EmployeeSchema])
+@pagination.paginate(pagination.PageNumberPagination, pass_parameter='pagination_info')
+def list_employees_with_page(request, **kwargs):
+    page = kwargs['pagination_info'].page
+    print(page)
+    return Employee.objects.all()
