@@ -1,8 +1,10 @@
 import datetime
-from typing import List, Generic, TypeVar, Optional
+from typing import Any, List, Generic, TypeVar, Optional
+from django.http import HttpRequest
 
 from django.shortcuts import get_object_or_404
 from ninja import ModelSchema, NinjaAPI, Schema, UploadedFile, File, Path, Query, Form, FilterSchema, pagination
+from ninja.security import HttpBearer, APIKeyQuery, HttpBasicAuth
 from pydantic import Field
 from pydantic.fields import ModelField
 from django.db.models import Q, Case, When
@@ -12,6 +14,12 @@ from employee.schemas import EmployeeSchema, EmployeeIn, EmployeeOut
 
 api = NinjaAPI()
 __all__ = ['api']
+
+
+class AuthBearer(HttpBearer):
+    def authenticate(self, request: HttpRequest, token: str) -> Any | None:
+        if token == 'supersecret':
+            return token
 
 
 class HelloSchema(Schema):
@@ -409,3 +417,40 @@ def list_employees_with_page(request, **kwargs):
     page = kwargs['pagination_info'].page
     print(page)
     return Employee.objects.all()
+
+
+@api.get('/bearer', auth=AuthBearer())
+def bearer(request):
+    return {'token': request.auth}
+
+
+class ApiKey(APIKeyQuery):
+    param_name = 'api_key'
+
+    def authenticate(self, request: HttpRequest, key: str | None) -> Any | None:
+        try:
+            print(key)
+            return True
+        except Exception as e:
+            pass
+
+
+@api.get('/apikey', auth=ApiKey())
+def apikey(request):
+    print(request.auth)
+    return f'Hello {request.auth}'
+
+
+class ServiceUnavailableError(Exception):
+    pass
+
+
+# initializing handler
+
+@api.exception_handler(ServiceUnavailableError)
+def service_unavailable(request, exc):
+    return api.create_response(
+        request,
+        {"message": "Please retry later"},
+        status=503,
+    )
