@@ -11,8 +11,10 @@ from django.db.models import Q, Case, When
 
 from employee.models import Department, Employee
 from employee.schemas import EmployeeSchema, EmployeeIn, EmployeeOut
+from project.api import router as project_router
 
 api = NinjaAPI()
+api.add_router('', project_router)
 __all__ = ['api']
 
 
